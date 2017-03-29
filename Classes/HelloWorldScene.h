@@ -19,6 +19,8 @@ class HelloWorld : public cocos2d::Layer
   CREATE_FUNC(HelloWorld);
   
   void addMonster(float dt);
+  bool onTouchBegan(Touch *touch, Event *unused_event);
+  bool onContactBegan(PhysicsContact &contact);
   
   private:
   Sprite* _player;

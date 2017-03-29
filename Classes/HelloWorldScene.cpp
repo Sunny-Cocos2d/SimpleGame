@@ -1,12 +1,20 @@
 #include "HelloWorldScene.h"
 #include "SimpleAudioEngine.h"
 
+using namespace CocosDenshion;
+
 USING_NS_CC;
+
+#define BACKGROUND_MUSIC_SFX  "background-music-aac.mp3"
+#define PEW_PEW_SFX           "pew-pew-lei.mp3"
 
 Scene* HelloWorld::createScene()
 {
   // 'scene' is an autorelease object
-  auto scene = Scene::create();
+  auto scene = Scene::createWithPhysics();
+  scene->getPhysicsWorld()->setGravity(Vec2(0,0));
+  scene->getPhysicsWorld()->setDebugDrawMask(PhysicsWorld::DEBUGDRAW_ALL);
+
   
   // 'layer' is an autorelease object
   auto layer = HelloWorld::create();
@@ -40,11 +48,83 @@ bool HelloWorld::init()
   _player->setPosition(Vec2(visibleSize.width * 0.1, visibleSize.height * 0.5));
   this->addChild(_player);
   
+  srand((unsigned int)time(nullptr));
+  this->schedule(schedule_selector(HelloWorld::addMonster), 1.5);
+
+  auto eventListener = EventListenerTouchOneByOne::create();
+  eventListener->onTouchBegan = CC_CALLBACK_2(HelloWorld::onTouchBegan, this);
+  this->getEventDispatcher()->addEventListenerWithSceneGraphPriority(eventListener, _player);
+  
+  auto contactListener = EventListenerPhysicsContact::create();
+  contactListener->onContactBegin = CC_CALLBACK_1(HelloWorld::onContactBegan, this);
+  this->getEventDispatcher()->addEventListenerWithSceneGraphPriority(contactListener, this);
+  
+  SimpleAudioEngine::getInstance()->playBackgroundMusic(BACKGROUND_MUSIC_SFX, true);
+
+  return true;
+}
+
+bool HelloWorld::onContactBegan(PhysicsContact &contact) {
+  auto nodeA = contact.getShapeA()->getBody()->getNode();
+  auto nodeB = contact.getShapeB()->getBody()->getNode();
+  
+  nodeA->removeFromParent();
+  nodeB->removeFromParent();
+  return true;
+}
+
+bool HelloWorld::onTouchBegan(Touch *touch, Event *unused_event) {
+  // 1  - Just an example for how to get the  _player object
+  //auto node = unused_event->getCurrentTarget();
+  
+  // 2
+  Vec2 touchLocation = touch->getLocation();
+  Vec2 offset = touchLocation - _player->getPosition();
+  
+  // 3
+  if (offset.x < 0) {
+    return true;
+  }
+  
+  // 4
+  auto projectile = Sprite::create("projectile.png");
+  projectile->setPosition(_player->getPosition());
+  this->addChild(projectile);
+  
+  auto projectileSize = projectile->getContentSize();
+  auto physicsBody = PhysicsBody::createCircle(projectileSize.width/2 );
+  physicsBody->setDynamic(true);
+  physicsBody->setCategoryBitmask(0x02);    // 0010
+  physicsBody->setContactTestBitmask(0xFFFFFFFF);
+  projectile->setPhysicsBody(physicsBody);
+  
+  
+  // 5
+  offset.normalize();
+  auto shootAmount = offset * 1000;
+  
+  // 6
+  auto realDest = shootAmount + projectile->getPosition();
+  
+  // 7
+  auto actionMove = MoveTo::create(2.0f, realDest);
+  auto actionRemove = RemoveSelf::create();
+  projectile->runAction(Sequence::create(actionMove,actionRemove, nullptr));
+  
+  SimpleAudioEngine::getInstance()->playEffect(PEW_PEW_SFX);
   return true;
 }
 
 void HelloWorld::addMonster(float dt) {
   auto monster = Sprite::create("monster.png");
+  // 1
+  auto monsterSize = monster->getContentSize();
+  auto physicsBody = PhysicsBody::createBox(Size(monsterSize.width , monsterSize.height),
+                                            PhysicsMaterial(0.1f, 1.0f, 0.0f));
+  physicsBody->setDynamic(true);
+  physicsBody->setCategoryBitmask(0x02);    // 0010
+  physicsBody->setContactTestBitmask(0xFFFFFFFF);
+  monster->setPhysicsBody(physicsBody);
   
   // 1
   auto monsterContentSize = monster->getContentSize();
